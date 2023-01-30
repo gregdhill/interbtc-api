@@ -29,6 +29,7 @@
     "initialize": "run-s build && ts-node src/utils/setup --initialize",
     "hrmp-setup": "ts-node scripts/hrmp-setup",
     "runtime-upgrade": "ts-node scripts/runtime-upgrade",
+    "init-testnet": "ts-node scripts/init-testnet",
     "xcm-cross-chain-transfer": "ts-node scripts/xcm-cross-chain-transfer",
     "xcm-return-unknown-tokens": "ts-node scripts/xcm-return-unknown-tokens",
     "democracy": "ts-node scripts/democracy",
