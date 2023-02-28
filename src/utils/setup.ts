@@ -248,9 +248,9 @@ async function main(params: InitializationParams): Promise<void> {
         const exchangeRateToSet =
             params.setExchangeRate === true
                 ? (defaultInitializationParams.setExchangeRate as unknown as ExchangeRate<
-                      Bitcoin,
-                      CollateralCurrencyExt
-                  >)
+                    Bitcoin,
+                    CollateralCurrencyExt
+                >)
                 : params.setExchangeRate;
         await initializeExchangeRate(exchangeRateToSet, oracleAccountInterBtcApi.oracle);
     }

@@ -3,8 +3,8 @@ import { bnToHex } from "@polkadot/util";
 import { StorageKey, Bytes } from "@polkadot/types/primitive";
 import { ApiPromise } from "@polkadot/api";
 import BN from "bn.js";
-import { ITuple, Codec } from "@polkadot/types/types";
-import { AddressOrPair } from "@polkadot/api/types";
+import { ITuple } from "@polkadot/types/types";
+import { AddressOrPair, SubmittableExtrinsic } from "@polkadot/api/types";
 
 import { stripHexPrefix } from "./encoding";
 import { DefaultTransactionAPI } from "../parachain";
@@ -40,33 +40,36 @@ export async function setNumericStorage(
     isLittleEndian = true
 ): Promise<void> {
     const data = bnToHex(value, { bitLength: bits, isLe: isLittleEndian });
-    await setStorage(api, moduleName, storageItemName, data, account);
+    const tx = setStorageCall(api, moduleName, storageItemName, data);
+    await DefaultTransactionAPI.sendLogged(api, account, tx, undefined, true);
 }
 
-export async function setCodecStorage(
+export function setNumericStorageCall(
     api: ApiPromise,
     moduleName: string,
     storageItemName: string,
-    value: Codec,
-    account: AddressOrPair,
+    value: BN,
+    bits = 32,
     isLittleEndian = true
-): Promise<void> {
-    const data = value.toHex(isLittleEndian);
-    await setStorage(api, moduleName, storageItemName, data, account);
+): SubmittableExtrinsic<"promise"> {
+    const data = bnToHex(value, { bitLength: bits, isLe: isLittleEndian });
+    return setStorageCall(api, moduleName, storageItemName, data);
 }
 
-async function setStorage(
+function setStorageCall(
     api: ApiPromise,
     moduleName: string,
     storageItemName: string,
     data: string,
-    account: AddressOrPair
-): Promise<void> {
+): SubmittableExtrinsic<"promise"> {
     const key = getStorageKey(moduleName, storageItemName);
     const storageKey = api.createType("StorageKey", key);
     const storageData = api.createType("StorageData", data);
-    const tx = api.tx.sudo.sudo(api.tx.system.setStorage([[storageKey, storageData] as ITuple<[StorageKey, Bytes]>]));
-    await DefaultTransactionAPI.sendLogged(api, account, tx, undefined, true);
+    return api.tx.sudo.sudo(
+        api.tx.system.setStorage([
+            [storageKey, storageData] as ITuple<[StorageKey, Bytes]>
+        ])
+    );
 }
 
 export async function setStorageAtKey(
