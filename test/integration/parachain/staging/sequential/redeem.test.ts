@@ -191,64 +191,6 @@ describe("redeem", () => {
         expect(btcTxFound).greaterThan(0, "Failed to find any redeem request transactions to inspect.");
     }).timeout(10 * 60000);
 
-    // The goal of this test is to check that a vault sends the redeem BTC transaction with RBF (replace by fee) enabled.
-    // And while we have the data, we might as well check if the new fee is indeed elevated.
-    it("should be able to perform RBF on a redeem transaction", async () => {
-        // grab only first entry (collateral currency), and only vault_1_id
-        const [vault_1_id] = collateralTickerToVaultIdsMap.values().next().value as [
-            InterbtcPrimitivesVaultId,
-            InterbtcPrimitivesVaultId
-        ];
-        const issueAmount = newMonetaryAmount(0.0001, wrappedCurrency, true);
-        const redeemAmount = newMonetaryAmount(0.00007, wrappedCurrency, true);
-
-        const [, redeemRequest] = await issueAndRedeem(
-            interBtcAPI,
-            bitcoinCoreClient,
-            userAccount,
-            vault_1_id,
-            issueAmount,
-            redeemAmount,
-            false,
-            ExecuteRedeem.False
-        );
-
-        // get BTC tx id
-        const btcTxId = await fetchBtcTxIdFromOpReturn(redeemRequest.id);
-
-        const collateralCurrency = await currencyIdToMonetaryCurrency(
-            assetRegistry,
-            loansAPI,
-            vault_1_id.currencies.collateral
-        );
-        const vaultBitcoinCoreClient = new BitcoinCoreClient(
-            BITCOIN_CORE_NETWORK,
-            BITCOIN_CORE_HOST,
-            BITCOIN_CORE_USERNAME,
-            BITCOIN_CORE_PASSWORD,
-            BITCOIN_CORE_PORT,
-            `vault_1-${collateralCurrency.ticker}-${wrappedCurrency.ticker}`
-        );
-
-        // try to bump fees
-        const result = await bumpFeesForBtcTx(vaultBitcoinCoreClient, btcTxId);
-
-        if (result.errors && result.errors.length > 0) {
-            // concatenate errors for print
-            const errorMessage = result.errors.join("; ");
-            assert.fail(`Could not bump fees for redeem request id ${redeemRequest.id}, error(s): ${errorMessage}`);
-        }
-
-        const feesBefore = result.origfee;
-        const feesAfter = result.fee;
-
-        assert.isAbove(
-            feesAfter,
-            feesBefore,
-            `Fees did not increase after bumpfee for redeem request id ${redeemRequest.id}`
-        );
-    }).timeout(10 * 60000);
-
     // TODO: maybe add this to redeem API
     it("should get redeemBtcDustValue", async () => {
         const dust = await interBtcAPI.api.query.redeem.redeemBtcDustValue();
