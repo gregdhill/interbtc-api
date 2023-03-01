@@ -168,7 +168,6 @@ export async function initializeExchangeRate(
 export async function initializeBtcTxFees(fees: Big, oracleAPI: OracleAPI): Promise<void> {
     console.log("Initializing BTC tx fees...");
     await oracleAPI.setBitcoinFees(fees);
-    await oracleAPI.waitForFeeEstimateUpdate();
 }
 
 export async function initializeVaultNomination(enabled: boolean, nominationAPI: NominationAPI): Promise<void> {

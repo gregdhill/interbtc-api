@@ -56,7 +56,7 @@ export function setNumericStorageCall(
     return setStorageCall(api, moduleName, storageItemName, data);
 }
 
-function setStorageCall(
+export function setStorageCall(
     api: ApiPromise,
     moduleName: string,
     storageItemName: string,

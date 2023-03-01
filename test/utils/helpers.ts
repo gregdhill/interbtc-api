@@ -24,6 +24,9 @@ import {
     getStorageMapItemKey,
     setStorageAtKey,
     DefaultTransactionAPI,
+    setStorageCall,
+    encodeUnsignedFixedPoint,
+    ATOMIC_UNIT,
 } from "../../src";
 import { SUDO_URI } from "../config";
 import { expect } from "chai";
@@ -43,7 +46,7 @@ export function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function wait_success<R>(call: () => Promise<R>): Promise<R> {
+export async function waitSuccess<R>(call: () => Promise<R>): Promise<R> {
     for (; ;) {
         try {
             const res = await call();
@@ -54,32 +57,32 @@ export async function wait_success<R>(call: () => Promise<R>): Promise<R> {
     }
 }
 
-export async function callWithExchangeRate(
-    oracleAPI: OracleAPI,
-    exchangeRate: ExchangeRate<Bitcoin, CurrencyExt>,
-    fn: () => Promise<void>
-): Promise<void> {
-    const initialExchangeRate = await oracleAPI.getExchangeRate(exchangeRate.counter);
-    await oracleAPI.setExchangeRate(exchangeRate);
-    await oracleAPI.waitForExchangeRateUpdate(exchangeRate);
-    let result: Promise<void>;
-    try {
-        await fn();
-        result = Promise.resolve();
-    } catch (error) {
-        console.log(`Error: ${(error as Error).toString()}`);
-        result = Promise.reject(error);
-    } finally {
-        await oracleAPI.setExchangeRate(initialExchangeRate);
-        await oracleAPI.waitForExchangeRateUpdate(initialExchangeRate);
-    }
+// export async function callWithExchangeRate(
+//     oracleAPI: OracleAPI,
+//     exchangeRate: ExchangeRate<Bitcoin, CurrencyExt>,
+//     fn: () => Promise<void>
+// ): Promise<void> {
+//     const initialExchangeRate = await oracleAPI.getExchangeRate(exchangeRate.counter);
+//     await oracleAPI.setExchangeRate(exchangeRate);
+//     await oracleAPI.waitForExchangeRateUpdate(exchangeRate);
+//     let result: Promise<void>;
+//     try {
+//         await fn();
+//         result = Promise.resolve();
+//     } catch (error) {
+//         console.log(`Error: ${(error as Error).toString()}`);
+//         result = Promise.reject(error);
+//     } finally {
+//         await oracleAPI.setExchangeRate(initialExchangeRate);
+//         await oracleAPI.waitForExchangeRateUpdate(initialExchangeRate);
+//     }
 
-    return result;
-}
+//     return result;
+// }
 
 // Calls fn wrapped in custom exchange rate with oracles removed, so that
 // exchange rate can not be overwritten during the test execution
-export async function callWithExchangeRateOverwritten(
+export async function callWithExchangeRate(
     sudoInterBtcAPI: InterBtcApi,
     currency: CurrencyExt,
     newExchangeRateHex: `0x${string}`,
@@ -109,6 +112,9 @@ export async function callWithExchangeRateOverwritten(
     // Change Exchange rate storage for currency.
     const exchangeRateOracleKey = createExchangeRateOracleKey(api, currency);
     const initialExchangeRate = (await api.query.oracle.aggregate(exchangeRateOracleKey)).toHex();
+
+    // const encodedExchangeRate = encodeUnsignedFixedPoint(api, exchangeRate.toBig([ATOMIC_UNIT, ATOMIC_UNIT]));
+    // const storageData = api.createType("UnsignedFixedPoint", encodedExchangeRate).toHex();
 
     const exchangeRateStorageKey = getStorageMapItemKey("Oracle", "Aggregate", exchangeRateOracleKey.toHex());
     await setStorageAtKey(sudoInterBtcAPI.api, exchangeRateStorageKey, newExchangeRateHex, sudoAccount);
