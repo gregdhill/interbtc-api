@@ -33,6 +33,8 @@ interface MultiPathElementStandard extends MultiPathElementBase {
 interface MultiPathElementStablePlain extends MultiPathElementBase {
     type: MultiPathElementType.STABLE_PLAIN;
     pool: StableLiquidityPool;
+    inputIndex: number;
+    outputIndex: number;
 }
 
 interface MultiPathElementStableMeta extends MultiPathElementBase {
@@ -40,6 +42,8 @@ interface MultiPathElementStableMeta extends MultiPathElementBase {
     pool: StableLiquidityPool;
     basePool: StableLiquidityPool;
     fromBase: boolean;
+    inputIndex: number;
+    outputIndex: number;
 }
 
 type MultiPathElementStable = MultiPathElementStablePlain | MultiPathElementStableMeta;

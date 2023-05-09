@@ -40,11 +40,12 @@ import {
     StableLiquidityPool,
     PoolType,
     encodeSwapParamsForStandardPoolsOnly,
-    encodeSwapParamsForStandardAndStablePools,
     isStableMultiPathElement,
     isStableMetaPool,
     isStandardPool,
     StableLiquidityMetaPool,
+    isStableMetaMultiPathElement,
+    getSwapOutputAmount,
 } from "./amm/";
 import { ExtrinsicData } from "../types/extrinsic";
 
@@ -578,19 +579,61 @@ export class DefaultAMMAPI implements AMMAPI {
         recipient: AddressOrPair,
         deadline: number | string
     ): ExtrinsicData {
-        const { amountIn, amountOutMin, path } = encodeSwapParamsForStandardAndStablePools(
-            this.api,
-            trade,
-            minimumAmountOut
-        );
-        const swapExtrinsic = this.api.tx.dexSwapRouter.swapExactTokenForTokensThroughStablePool(
-            amountIn,
-            amountOutMin,
-            path,
-            addressOrPairAsAccountId(this.api, recipient),
-            deadline
-        );
+        const recipientAccount = addressOrPairAsAccountId(this.api, recipient);
+        let amountOut = trade.inputAmount;
+        let path: Array<SubmittableExtrinsic<"promise">> = [];
+        trade.path.forEach((pathElement, idx) => {
+            const amountIn = amountOut.toString(true);
+            // update the input amount for the next trade
+            amountOut = getSwapOutputAmount(pathElement, amountOut);
+            // only limit the output amount if this is the last trade
+            const amountOutMin = idx === trade.path.length - 1 ? minimumAmountOut.toString(true) : '0';
+            path.push(isStableMultiPathElement(pathElement)
+                ? isStableMetaMultiPathElement(pathElement)
+                    ? pathElement.fromBase
+                        ? this.api.tx.dexStable.swapPoolFromBase(
+                            pathElement.pool.poolId,
+                            pathElement.basePool.poolId,
+                            pathElement.inputIndex,
+                            pathElement.outputIndex,
+                            amountIn,
+                            amountOutMin,
+                            recipientAccount,
+                            deadline,
+                        )
+                        : this.api.tx.dexStable.swapPoolToBase(
+                            pathElement.pool.poolId,
+                            pathElement.basePool.poolId,
+                            pathElement.inputIndex,
+                            pathElement.outputIndex,
+                            amountIn,
+                            amountOutMin,
+                            recipientAccount,
+                            deadline,
+                        )
+                    : this.api.tx.dexStable.swap(
+                        pathElement.pool.poolId,
+                        pathElement.inputIndex,
+                        pathElement.outputIndex,
+                        amountIn,
+                        amountOutMin,
+                        recipientAccount,
+                        deadline
+                    )
+                : this.api.tx.dexGeneral.swapExactAssetsForAssets(
+                    amountIn,
+                    amountOutMin,
+                    [
+                        newCurrencyId(this.api, pathElement.input),
+                        newCurrencyId(this.api, pathElement.output)
+                    ],
+                    recipientAccount,
+                    deadline
+                )
+            );
+        });
 
+        const swapExtrinsic = this.api.tx.utility.batchAll(path);
         return { extrinsic: swapExtrinsic, event: this.api.events.dexStable.CurrencyExchange };
     }
 

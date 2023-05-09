@@ -8,6 +8,8 @@ import {
     MultiPathElementStablePlain,
     MultiPathElementType,
     TradingPair,
+    MultiPathElement,
+    isStableMultiPathElement,
 } from "../trade/types";
 import { StableLiquidityPool } from "./stable";
 import { isStablePool, isStandardPool, LiquidityPool } from "./types";
@@ -47,15 +49,17 @@ function generateOutputFunction<Path extends MultiPathElementStable>(pathOf: (cu
         getStableSwapOutputAmount(pathOf(inputAmount.currency), inputAmount);
 }
 
-function convertPoolToTradingPair(pool: StableLiquidityPool, token0: CurrencyExt, token1: CurrencyExt): TradingPair {
+function convertPoolToTradingPair(pool: StableLiquidityPool, token0: CurrencyExt, token1: CurrencyExt, index0: number, index1: number): TradingPair {
     if (!(pool.involvesToken(token0) && pool.involvesToken(token1))) {
-        throw new Error("converPoolToTradingPair: provided currencies are not part of pool.");
+        throw new Error("convertPoolToTradingPair: provided currencies are not part of pool.");
     }
 
     const pathOf = (currency: CurrencyExt): MultiPathElementStablePlain => ({
         type: MultiPathElementType.STABLE_PLAIN,
         input: currency,
         output: isCurrencyEqual(currency, token0) ? token1 : token0,
+        inputIndex: isCurrencyEqual(currency, token0) ? index0 : index1,
+        outputIndex: isCurrencyEqual(currency, token0) ? index1 : index0,
         pool: pool,
     });
 
@@ -73,16 +77,20 @@ function convertPoolAndBaseToTradingPair(
     basePool: StableLiquidityPool,
     metaPool: StableLiquidityMetaPool,
     token0: CurrencyExt,
-    token1: CurrencyExt
+    token1: CurrencyExt,
+    index0: number,
+    index1: number,
 ): TradingPair {
     if (!(basePool.involvesToken(token0) && metaPool.involvesToken(token1))) {
-        throw new Error("converPoolAndBaseToTradingPair: incorrect tokens provided");
+        throw new Error("convertPoolAndBaseToTradingPair: incorrect tokens provided");
     }
 
     const pathOf = (currency: CurrencyExt): MultiPathElementStableMeta => ({
         type: MultiPathElementType.STABLE_META,
         input: currency,
         output: isCurrencyEqual(currency, token0) ? token1 : token0,
+        inputIndex: isCurrencyEqual(currency, token0) ? index0 : index1,
+        outputIndex: isCurrencyEqual(currency, token0) ? index1 : index0,
         pool: metaPool,
         basePool: basePool,
         fromBase: !!isCurrencyEqual(currency, token0),
@@ -112,19 +120,18 @@ const convertStablePoolToTradingPairs = (
             const token0 = pool.actuallyPooledCurrencies[j].currency;
             const token1 = pool.actuallyPooledCurrencies[k].currency;
 
-            pairs.push(convertPoolToTradingPair(pool, token0, token1));
+            pairs.push(convertPoolToTradingPair(pool, token0, token1, j, k));
         }
 
         if (!relatedMetaPools.length) continue;
 
         for (const otherMetaPool of relatedMetaPools) {
-            for (const { currency } of otherMetaPool.actuallyPooledCurrencies) {
-                if (isCurrencyEqual(currency, pool.lpToken)) continue;
-
+            for (let k = 0; k < otherMetaPool.actuallyPooledCurrencies.length; k++) {
                 const token0 = pool.actuallyPooledCurrencies[j].currency;
-                const token1 = currency;
+                const token1 = otherMetaPool.actuallyPooledCurrencies[k].currency;
+                if (isCurrencyEqual(token1, pool.lpToken)) continue;
 
-                pairs.push(convertPoolAndBaseToTradingPair(pool, otherMetaPool, token0, token1));
+                pairs.push(convertPoolAndBaseToTradingPair(pool, otherMetaPool, token0, token1, j, k));
             }
         }
     }
@@ -209,4 +216,15 @@ const getStableSwapOutputAmount = (
     return outputAmount;
 };
 
-export { getAllTradingPairs, getStableSwapOutputAmount, filterNonEmptyPools };
+const getSwapOutputAmount = (
+    pathElement: MultiPathElement,
+    inputAmount: MonetaryAmount<CurrencyExt>
+): MonetaryAmount<CurrencyExt> => {
+    if (isStableMultiPathElement(pathElement)) {
+        return getStableSwapOutputAmount(pathElement, inputAmount);
+    } else {
+        return pathElement.pool.getOutputAmount(inputAmount);
+    }
+}
+
+export { getAllTradingPairs, getStableSwapOutputAmount, getSwapOutputAmount, filterNonEmptyPools };
