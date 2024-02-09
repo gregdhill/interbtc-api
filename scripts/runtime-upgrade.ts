@@ -112,7 +112,8 @@ async function main(): Promise<void> {
 
     const batched = paraApi.tx.utility.batchAll(
         [paraApi.tx.parachainSystem.authorizeUpgrade(codeHash, true)].concat(
-            await setAllClientReleases(paraApi, clientsBaseUrl, args["runtime-name"])
+            ...await setAllClientReleases(paraApi, clientsBaseUrl, args["runtime-name"]),
+            paraApi.tx.txPause.pause(["Ethereum", null]),
         )
     );
 
